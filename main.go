@@ -66,6 +66,9 @@ type Game struct {
 	Next_targetY     float32
 	SpeedBalle       float32
 	Win              int
+	dir              int
+	Points1          int
+	Points2          int
 }
 
 var (
@@ -91,7 +94,6 @@ func (p *Player) Update(g *Game) {
 		if p.cooldown > 0 {
 			p.playerSpeed = 4
 		}
-		var dir int
 		if ebiten.IsKeyPressed(p.LeftKey) {
 			p.X -= float64(p.playerSpeed)
 			if p.playerSpeed == 16 && !p.balleTake && math.Abs(float64(p.posXD)-p.X) >= 100 || math.Abs(float64(p.posYD)-p.Y) >= 100 && p.playerSpeed == 16 && !p.balleTake {
@@ -101,7 +103,7 @@ func (p *Player) Update(g *Game) {
 			}
 			//set la direction de la balle
 			if p.balleTake && ebiten.IsKeyPressed(p.DashKey) {
-				dir = 1
+				g.dir = 1
 			}
 		}
 		if ebiten.IsKeyPressed(p.RightKey) {
@@ -113,7 +115,7 @@ func (p *Player) Update(g *Game) {
 			}
 			//set la direction de la balle
 			if p.balleTake && ebiten.IsKeyPressed(p.DashKey) {
-				dir = 2
+				g.dir = 2
 			}
 		}
 		if ebiten.IsKeyPressed(p.UpKey) {
@@ -125,7 +127,7 @@ func (p *Player) Update(g *Game) {
 			}
 			//set la direction de la balle
 			if p.balleTake && ebiten.IsKeyPressed(p.DashKey) {
-				dir = 3
+				g.dir = 3
 			}
 		}
 		if ebiten.IsKeyPressed(p.DownKey) {
@@ -137,38 +139,22 @@ func (p *Player) Update(g *Game) {
 			}
 			//set la direction de la balle
 			if p.balleTake && ebiten.IsKeyPressed(p.DashKey) {
-				dir = 4
+				g.dir = 4
 			}
-		}
-		//déplacement de la balle
-		if dir == 1 && g.SpeedBalle > 0 {
-			g.balleX -= g.SpeedBalle
-		}
-		if dir == 2 && g.SpeedBalle > 0 {
-			g.balleX += g.SpeedBalle
-		}
-		if dir == 3 && g.SpeedBalle > 0 {
-			g.balleY -= g.SpeedBalle
-		}
-		if dir == 4 && g.SpeedBalle > 0 {
-			g.balleY += g.SpeedBalle
 		}
 		//dash/lancée
 		if ebiten.IsKeyPressed(p.DashKey) {
 			if p.cooldown <= 0 && p.playerSpeed == 4 {
-
 				if !p.balleTake {
 					p.playerSpeed = 16
 					p.cooldown = 0
 					p.posXD = int(p.X)
 					p.posYD = int(p.Y)
 				}
-
 			}
 			//petit déplacement de la balle qu'elle est lancée
 			if p.balleTake && p.cooldown <= 0 {
-				g.SpeedBalle = 16
-				switch dir {
+				switch g.dir {
 				case 1:
 					g.balleX -= 100
 				case 2:
@@ -176,10 +162,25 @@ func (p *Player) Update(g *Game) {
 				case 3:
 					g.balleY -= 100
 				case 4:
-					g.balleY += 100
+					g.balleY += 150
 				}
 				p.balleTake = false
+				p.cooldown = 3
+				g.SpeedBalle = 5
 			}
+		}
+		//déplacement de la balle
+		if g.dir == 1 && g.SpeedBalle > 0 && !p.balleTake {
+			g.balleX -= g.SpeedBalle
+		}
+		if g.dir == 2 && g.SpeedBalle > 0 && !p.balleTake {
+			g.balleX += g.SpeedBalle
+		}
+		if g.dir == 3 && g.SpeedBalle > 0 && !p.balleTake {
+			g.balleY -= g.SpeedBalle
+		}
+		if g.dir == 4 && g.SpeedBalle > 0 && !p.balleTake {
+			g.balleY += g.SpeedBalle
 		}
 		//collision balle et joueur
 		if CircleRectCollide(float64(g.balleX), float64(g.balleY), BalleRadius, p.X, p.Y, playerW, playerH) {
@@ -191,8 +192,22 @@ func (p *Player) Update(g *Game) {
 			g.balleY = float32(p.Y)
 		}
 		//diminution de la vitesse de la balle
-		if g.SpeedBalle != 0 && !p.balleTake {
+		if g.SpeedBalle > 0 && !p.balleTake {
 			g.SpeedBalle -= 0.03
+		}
+		//rebonds verticaux
+		if g.balleY <= 75 {
+			g.dir = 4
+		}
+		if g.balleY >= 625 {
+			g.dir = 3
+		}
+		//rebonds horizontaux
+		if g.balleX <= 75 {
+			g.dir = 2
+		}
+		if g.balleX >= 825 {
+			g.dir = 1
 		}
 		// Limites horizontales
 		if p.X < p.MinX {
@@ -229,7 +244,7 @@ func NewGame() *Game {
 	g.targetX = 100
 	g.targetY = 300
 	g.Win = 0
-	g.SpeedBalle = 3
+	g.SpeedBalle = 0
 	g.leftBorderColor = color.RGBA{R: 70, G: 130, B: 180, A: 255}  // steelblue
 	g.rightBorderColor = color.RGBA{R: 180, G: 70, B: 130, A: 255} // rose
 	g.midLineColor = color.RGBA{R: 30, G: 30, B: 30, A: 255}
@@ -403,6 +418,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		vector.StrokeCircle(screen, rinkX+rinkW-goalOffset-creaseR, rinkY+rinkH/2, creaseR, 2, color.RGBA{10, 50, 150, 255}, true)
 		vector.DrawFilledCircle(screen, rinkX+goalOffset+creaseR+20, rinkY+rinkH/2-80, 5, color.RGBA{200, 30, 30, 255}, true)
 		vector.DrawFilledCircle(screen, rinkX+rinkW-goalOffset-creaseR-20, rinkY+rinkH/2+80, 5, color.RGBA{200, 30, 30, 255}, true)
+		//balle
 		vector.DrawFilledCircle(screen, g.balleX, g.balleY, BalleRadius, color.RGBA{0, 0, 0, 255}, true)
 		// dessiner les joueurs
 		g.p1a.Draw(screen)
